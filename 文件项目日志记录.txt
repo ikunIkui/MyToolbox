@@ -1,0 +1,30 @@
+mytoolbox/
+├── main.py                     程序入口
+├── app_paths.py                路径与配置
+├── theme.py                    主题管理
+├── widgets.py                  通用控件
+├── anim.py                     动画工具
+├── commands.py                 命令注册表
+├── scheduler.py                任务调度
+├── notifier.py                 通知模块
+├── logger.py                   操作日志
+├── location_win.py             Windows 系统定位
+├── weather.py                  天气数据
+├── weather_widget.py           天气卡片
+├── note_db.py                  笔记数据库
+├── note_page.py                笔记页面
+├── note_classifier.py          笔记智能分类
+├── nlp_reminder.py             自然语言提醒
+├── exporter.py                 文档导出
+├── doc_convert.py              文档互转
+├── settings_page.py            设置页
+├── autostart.py                开机自启
+├── changelog.py                更新日志数据
+├── changelog_widget.py         更新日志页面
+├── features.py                 功能注册表
+├── main_window.py              主窗口
+├── setup.iss                   Inno Setup 脚本
+├── build.bat                   一键打包脚本
+├── res/check.svg               复选框对勾图标
+├── app.ico                     程序图标（可选）
+└── version_info.txt            版本信息（可选）

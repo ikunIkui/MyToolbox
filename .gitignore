@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Inno Setup
+Output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# System
+Thumbs.db
+Desktop.ini
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Local
+*.local
+.env

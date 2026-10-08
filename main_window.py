@@ -332,7 +332,7 @@ class FeatureContext:
 
 # ==================== 首页 ====================
 class FeaturesPage(QWidget):
-    VOLATILE_KEYS = {"note", "weather", "docconvert", "todo"}
+    VOLATILE_KEYS = {"note", "weather", "docconvert", "todo", "clicker"}
 
     def go_home(self):
         self.stack.setCurrentIndex(0)
@@ -374,7 +374,7 @@ class FeaturesPage(QWidget):
         for f in self.features:
             groups.setdefault(f.category, []).append(f)
 
-        order = ["时间管理", "系统工具", "内容创作", "系统信息", "其他"]
+        order = ["时间管理", "系统工具", "内容创作", "系统信息", "自动化", "其他"]
         ordered = [(c, groups[c]) for c in order if c in groups]
 
         self._cards.clear()
@@ -678,7 +678,7 @@ class MainWindow(QMainWindow):
         self.log_page.load_recent(rows)
 
         try:
-            for key in ("todo", "note", "weather", "docconvert"):
+            for key in ("todo", "note", "weather", "docconvert", "clicker"):
                 self.features_page._destroy_detail(key)
         except Exception:
             pass

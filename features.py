@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Callable
-
+from clicker_page import ClickerPage
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QFileDialog, QMessageBox, QListWidget, QListWidgetItem, QComboBox,
@@ -140,6 +140,10 @@ def make_todo_page_factory(win):
         return TodoPage(win)
     return _factory
 
+def make_clicker_page_factory(win):
+    def _factory():
+        return ClickerPage(win)
+    return _factory
 
 # ==================== 文档互转 ====================
 
@@ -333,7 +337,7 @@ def make_weather_page(on_set_city, on_auto, on_hint):
 
 # ==================== 注册表（带分类） ====================
 
-CATEGORIES = ["时间管理", "系统工具", "内容创作", "系统信息"]
+CATEGORIES = ["时间管理", "系统工具", "内容创作", "系统信息", "自动化"]
 
 
 def get_features(ctx) -> list[Feature]:
@@ -375,4 +379,8 @@ def get_features(ctx) -> list[Feature]:
         Feature("colorpicker", "取色器", "🎨", "屏幕取色",
                 make_placeholder("🎨 取色器", "取色器开发中…", ""),
                 "", category="系统工具"),
+        # 自动化
+        Feature("clicker", "键盘连点器", "🎯", "自动按键工具",
+                make_clicker_page_factory(ctx.win),
+                "", category="自动化"),
     ]

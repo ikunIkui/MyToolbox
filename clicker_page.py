@@ -257,7 +257,7 @@ class ClickerPage(QWidget):
         title.setStyleSheet("font-size: 18px; font-weight: bold;")
         root.addWidget(title)
 
-        tip = QLabel("自动按键工具，支持自定义按键和间隔")
+        tip = QLabel("自动按键工具，支持自定义按键和间隔\n\n-目前这个项目有bug 选择发送模式请使用模拟点击请选择兼容性\n\n-不能使用其他的软件这个是重点 后续进行优化以及新增功能鼠标自动点击器.")
         tip.setStyleSheet("color: #9aa2b1; font-size: 12px;")
         root.addWidget(tip)
 

@@ -8,7 +8,7 @@ from PySide6.QtCore import (
     Qt, QTimer, Signal, QPropertyAnimation, QEasingCurve, QAbstractAnimation,
     QRect,
 )
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLineEdit,
     QPushButton, QListWidget, QStackedWidget, QLabel, QPlainTextEdit,
@@ -26,6 +26,7 @@ from anim import fade_in, slide_in_from_right, slide_in_from_left
 from logger import ActionLogger
 from task_history import TaskHistory
 from app_paths import load_config, save_config
+from clipboard_watcher import ClipboardWatcher
 
 
 UNIT = {
@@ -330,162 +331,131 @@ class FeatureContext:
         self.win._do_notify("📍 已切换为自动定位", "正在重新获取…")
 
 
-# ==================== 首页 ====================
+# ==================== 首页（分组宫格） ====================
 class FeaturesPage(QWidget):
-    VOLATILE_KEYS = {"note", "weather", "docconvert", "todo", "clicker"}
-
-    def go_home(self):
-        self.stack.setCurrentIndex(0)
-        QTimer.singleShot(0, self._play_grid_anim)
-
     def __init__(self, ctx: FeatureContext, colors: dict = None, parent=None):
         super().__init__(parent)
         self.ctx = ctx
         self.colors = colors or DEFAULT_COLORS
         self.features = get_features(ctx)
         self._feature_map = {f.key: f for f in self.features}
-        self._cards: list[FeatureCard] = []
-        self._first_show = True
-        self._detail_cache: dict[str, QWidget] = {}
+        self._did_first_relayout = False
+
+        order = ["时间管理", "系统工具", "内容创作", "系统信息", "自动化", "其他"]
+        self._groups: dict[str, list[Feature]] = {}
+        for f in self.features:
+            self._groups.setdefault(f.category, []).append(f)
+        self._order = [c for c in order if c in self._groups]
+
+        self._grids: dict[str, QGridLayout] = {}
+        self._group_cards: dict[str, list[QFrame]] = {}
+
+        self._build_ui()
+
+    def _build_ui(self):
+        c = self.colors
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        self.stack = QStackedWidget()
-        root.addWidget(self.stack)
-        self.stack.addWidget(self._build_grid_page())
-        self.stack.setCurrentIndex(0)
-
-    def _build_grid_page(self) -> QWidget:
-        page = QWidget()
-        v = QVBoxLayout(page)
-        v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(8)
+        root.setSpacing(8)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
 
         inner = QWidget()
-        inner_v = QVBoxLayout(inner)
-        inner_v.setContentsMargins(4, 4, 4, 4)
-        inner_v.setSpacing(20)
+        self._inner_layout = QVBoxLayout(inner)
+        self._inner_layout.setContentsMargins(8, 8, 8, 8)
+        self._inner_layout.setSpacing(18)
 
-        groups: dict[str, list[Feature]] = {}
-        for f in self.features:
-            groups.setdefault(f.category, []).append(f)
+        title = QLabel("我的工具")
+        title.setStyleSheet(
+            f"font-size: 20px; font-weight: bold; padding: 4px 0; "
+            f"color: {c['text']};"
+        )
+        self._inner_layout.addWidget(title)
 
-        order = ["时间管理", "系统工具", "内容创作", "系统信息", "自动化", "其他"]
-        ordered = [(c, groups[c]) for c in order if c in groups]
+        for cat in self._order:
+            feats = self._groups[cat]
 
-        self._cards.clear()
-        cols = 4
+            head = QLabel(cat)
+            head.setStyleSheet(
+                f"font-size: 14px; font-weight: bold; "
+                f"color: {c['text_dim']}; padding: 4px 0;"
+            )
+            self._inner_layout.addWidget(head)
 
-        for cat, feats in ordered:
-            title = QLabel(cat)
-            title.setStyleSheet("font-size: 14px; font-weight: bold; padding: 4px 0;")
-            inner_v.addWidget(title)
-
-            grid_wrap = QWidget()
-            grid = QGridLayout(grid_wrap)
+            wrap = QWidget()
+            grid = QGridLayout(wrap)
             grid.setSpacing(12)
             grid.setContentsMargins(0, 0, 0, 0)
+            grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
 
-            for i, f in enumerate(feats):
+            cards: list[QFrame] = []
+            for f in feats:
                 card = FeatureCard(f, self.colors)
                 card.clicked.connect(self._open_feature)
-                grid.addWidget(card, i // cols, i % cols)
-                self._cards.append(card)
+                cards.append(card)
 
-            grid.setColumnStretch(cols, 1)
-            inner_v.addWidget(grid_wrap)
+            self._grids[cat] = grid
+            self._group_cards[cat] = cards
 
-        inner_v.addStretch()
+            self._inner_layout.addWidget(wrap)
+
+        self._inner_layout.addStretch()
         scroll.setWidget(inner)
-        v.addWidget(scroll, 1)
-        return page
+        root.addWidget(scroll, 1)
+
+    def _relayout(self):
+        w = self.width() if self.width() > 0 else 1000
+        cols = max(1, min(5, (w - 60) // 182))
+        for cat, grid in self._grids.items():
+            while grid.count():
+                grid.takeAt(0)
+            for i, card in enumerate(self._group_cards[cat]):
+                grid.addWidget(card, i // cols, i % cols)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        if not hasattr(self, "_resize_timer"):
+            self._resize_timer = QTimer(self)
+            self._resize_timer.setSingleShot(True)
+            self._resize_timer.timeout.connect(self._relayout)
+        self._resize_timer.start(120)
 
     def showEvent(self, e):
         super().showEvent(e)
-        if self._first_show:
-            self._first_show = False
-            QTimer.singleShot(30, self._play_grid_anim)
-
-    def _play_grid_anim(self):
-        if self.stack.currentIndex() != 0:
-            return
-        for i, card in enumerate(self._cards):
-            fade_in(card, duration=260, delay=i * 40)
+        if not self._did_first_relayout:
+            self._did_first_relayout = True
+            QTimer.singleShot(0, self._relayout)
 
     def _open_feature(self, key: str):
         feature = self._feature_map.get(key)
         if not feature:
             return
+        win = self.window()
+        if hasattr(win, "open_feature_detail"):
+            win.open_feature_detail(feature)
 
-        if key in self.VOLATILE_KEYS:
-            self._destroy_detail(key)
-
-        if key in self._detail_cache:
-            detail = self._detail_cache[key]
-            self.stack.setCurrentWidget(detail)
-            QTimer.singleShot(0, lambda: slide_in_from_right(detail, duration=240))
-            return
-
-        detail = QWidget()
-        v = QVBoxLayout(detail)
-        v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(8)
-
-        bar = QHBoxLayout()
-        back = QPushButton("← 返回")
-        back.setFixedWidth(80)
-        back.clicked.connect(self._go_back)
-        title = QLabel(f"{feature.icon}  {feature.title}")
-        title.setStyleSheet("font-size: 16px; font-weight: bold;")
-        bar.addWidget(back)
-        bar.addWidget(title)
-        bar.addStretch()
-        v.addLayout(bar)
-
-        try:
-            body = feature.factory()
-        except Exception as e:
-            body = QLabel(f"⚠️ 功能加载失败：{e}")
-            body.setStyleSheet("padding: 20px;")
-
-        body_scroll = QScrollArea()
-        body_scroll.setWidgetResizable(True)
-        body_scroll.setFrameShape(QFrame.NoFrame)
-        body_scroll.setWidget(body)
-        v.addWidget(body_scroll, 1)
-
-        self._detail_cache[key] = detail
-        self.stack.addWidget(detail)
-        self.stack.setCurrentWidget(detail)
-        QTimer.singleShot(0, lambda: slide_in_from_right(detail, duration=240))
-
-    def _destroy_detail(self, key: str):
-        detail = self._detail_cache.pop(key, None)
-        if detail is None:
-            return
-        if hasattr(detail, "cleanup"):
-            try:
-                detail.cleanup()
-            except Exception:
-                pass
-        self.stack.removeWidget(detail)
-        detail.setParent(None)
-        detail.deleteLater()
-
-    def _go_back(self):
-        cur = self.stack.currentWidget()
-        if cur is not None and cur is not self.stack.widget(0):
-            for k, v in list(self._detail_cache.items()):
-                if v is cur and k in self.VOLATILE_KEYS:
-                    self._destroy_detail(k)
-                    break
-
-        self.stack.setCurrentIndex(0)
-        QTimer.singleShot(0, self._play_grid_anim)
+    def apply_colors(self, colors: dict):
+        self.colors = colors
+        for cat, cards in self._group_cards.items():
+            for card in cards:
+                try:
+                    card.colors = colors
+                    card.setStyleSheet(f"""
+                        QFrame#featureCard {{
+                            background: {colors['bg_card']};
+                            border: 1px solid {colors['border']};
+                            border-radius: 10px;
+                        }}
+                        QFrame#featureCard:hover {{
+                            background: {colors['bg_card_hover']};
+                            border: 1px solid {colors['border_hover']};
+                        }}
+                    """)
+                except Exception:
+                    pass
 
 
 # ==================== 日志页 ====================
@@ -591,6 +561,10 @@ class MainWindow(QMainWindow):
         self.history = TaskHistory()
         self.scheduler.set_history(self.history)
         self.ctx = FeatureContext(self)
+        self.clipboard_watcher = ClipboardWatcher(self)
+
+        # 功能详情缓存
+        self._feature_detail_cache: dict[str, QWidget] = {}
 
         self.setWindowTitle("MyToolbox")
         self.setMinimumSize(MIN_W, MIN_H)
@@ -621,6 +595,47 @@ class MainWindow(QMainWindow):
                 autostart.enable()
         except Exception:
             pass
+
+    # ---------- 打开功能详情 ----------
+    def open_feature_detail(self, feature):
+        key = feature.key
+
+        if key in self._feature_detail_cache:
+            detail = self._feature_detail_cache[key]
+            self.stack.setCurrentWidget(detail)
+            return
+
+        detail = QWidget()
+        v = QVBoxLayout(detail)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(8)
+
+        bar = QHBoxLayout()
+        back = QPushButton("← 返回")
+        back.setFixedWidth(80)
+        back.clicked.connect(lambda: self.stack.setCurrentIndex(0))
+        title = QLabel(f"{feature.icon}  {feature.title}")
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        bar.addWidget(back)
+        bar.addWidget(title)
+        bar.addStretch()
+        v.addLayout(bar)
+
+        try:
+            body = feature.factory()
+        except Exception as e:
+            body = QLabel(f"⚠️ 功能加载失败：{e}")
+            body.setStyleSheet("padding: 20px;")
+
+        body_scroll = QScrollArea()
+        body_scroll.setWidgetResizable(True)
+        body_scroll.setFrameShape(QFrame.NoFrame)
+        body_scroll.setWidget(body)
+        v.addWidget(body_scroll, 1)
+
+        self._feature_detail_cache[key] = detail
+        self.stack.addWidget(detail)
+        self.stack.setCurrentWidget(detail)
 
     # ---------- 窗口几何 ----------
     def _restore_geometry(self):
@@ -678,10 +693,18 @@ class MainWindow(QMainWindow):
         self.log_page.load_recent(rows)
 
         try:
-            for key in ("todo", "note", "weather", "docconvert", "clicker"):
-                self.features_page._destroy_detail(key)
-        except Exception:
-            pass
+            # 清掉所有功能详情缓存（颜色变了，重建）
+            for key in list(self._feature_detail_cache.keys()):
+                detail = self._feature_detail_cache.pop(key)
+                self.stack.removeWidget(detail)
+                detail.setParent(None)
+                detail.deleteLater()
+
+            # 首页换色
+            self.features_page.apply_colors(colors)
+            QTimer.singleShot(0, self.features_page._relayout)
+        except Exception as e:
+            print(f"[theme] 重建失败: {e}")
 
     # ---------- 启动动画 + 欢迎 ----------
     def _play_startup_anim(self):
@@ -840,14 +863,6 @@ class MainWindow(QMainWindow):
 
     def _on_nav(self, row: int):
         self.stack.setCurrentIndex(row)
-        page = self.stack.currentWidget()
-
-        if page is self.features_page:
-            self.features_page.go_home()
-            return
-
-        if page:
-            fade_in(page, duration=180)
 
     def _on_nav_item_clicked(self, item):
         row = self.nav.row(item)
@@ -864,13 +879,11 @@ class MainWindow(QMainWindow):
             return
         self.cmd_input.clear()
 
-        # 内部日志信号，不当作命令
         if text.startswith("__log__"):
             msg = text[len("__log__"):].strip()
             self._append(msg, level="success", source="功能页")
             return
 
-        # 内部通知信号：屏幕浮窗 + 系统通知 + 声音
         if text.startswith("__notify__"):
             payload = text[len("__notify__"):].strip()
             if "|" in payload:
@@ -1023,7 +1036,19 @@ class MainWindow(QMainWindow):
 
     def _build_tray(self):
         self.tray = QSystemTrayIcon(self)
-        icon = self.style().standardIcon(QStyle.SP_ComputerIcon)
+
+        icon = None
+        try:
+            from app_paths import resource_path
+            icon_path = resource_path("res/app.ico")
+            if icon_path.exists():
+                icon = QIcon(str(icon_path))
+        except Exception as e:
+            print(f"[tray] 加载图标失败: {e}")
+
+        if icon is None or icon.isNull():
+            icon = self.style().standardIcon(QStyle.SP_ComputerIcon)
+
         self.tray.setIcon(icon)
         self.setWindowIcon(icon)
 

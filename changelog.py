@@ -10,6 +10,37 @@ class Release:
 
 CHANGELOG: list[Release] = [
     Release(
+        version="0.5.1",
+        date="2026-10-08",
+        items=[
+            # ===== 新增功能 =====
+            "新增系统监控：CPU / 内存 / 磁盘 / 网络 / GPU 实时刷新",
+            "GPU 卡片自适应：NVIDIA 独显显示占用率/显存/温度，核显显示型号，无 GPU 自动隐藏",
+            "GPU 型号首次查一次并缓存，避免每 2 秒起 PowerShell 卡 UI",
+            "新增剪贴板历史：自动记录复制的文本，关机/重启不丢",
+            "剪贴板单条删除支持 5 秒撤销，带进度条倒计时",
+            "设置页新增「清空剪贴板」按钮 + 「启用剪贴板监听」开关",
+            "新增 make_icon.py：PIL 生成多尺寸图标（16~256）",
+
+            # ===== 界面调整 =====
+            "首页改为「一页宫格 + 分类标题分隔」，不再点两层",
+            "首页列数随窗口宽度自适应（1~5 列）",
+            "托盘 / 窗口图标优先加载 res/app.ico，找不到时退回系统默认",
+            "更新日志页重构：旧版本默认折叠，最新版展开",
+            "更新日志页新增搜索框、顶部当前版本显示、最新版高亮",
+
+            # ===== 修复 =====
+            "修复系统版本显示 Windows 10，实际应为 Windows 11",
+            "修复 CPU 型号显示 Intel64 Family 6…，改读注册表拿真名",
+            "修复首页切换动画叠加导致越点越灰",
+            "修复首页概率无图标但可点击（effect 卡在 opacity=0）",
+            "修复功能详情页与待办页缓存的依赖，统一走 main_window 缓存",
+
+            # ===== 依赖 =====
+            "新增依赖：psutil（系统监控）、Pillow（图标生成）",
+        ],
+    ),
+    Release(
         version="0.0.0",
         date="admin",
         items=[
@@ -123,3 +154,14 @@ CHANGELOG: list[Release] = [
         ],
     ),
 ]
+
+
+# 当前版本（永远取 CHANGELOG 第一条，但跳过 admin）
+def _get_current_version() -> str:
+    for rel in CHANGELOG:
+        if rel.version != "0.0.0":
+            return rel.version
+    return "0.0.0"
+
+
+CURRENT_VERSION = _get_current_version()

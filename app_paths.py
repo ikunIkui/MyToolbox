@@ -32,6 +32,7 @@ def is_frozen() -> bool:
 
 
 _DEFAULT_CONFIG = {
+    "clipboard_enabled": True,
     "weather_city": "",
     "weather_cache": None,
     "theme": "auto",

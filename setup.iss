@@ -1,5 +1,5 @@
 #define MyAppName "MyToolbox"
-#define MyAppVersion "0.5.0"
+#define MyAppVersion "0.5.1"
 #define MyAppPublisher "涛涛"
 #define MyAppURL "https://github.com/ikunIkui/MyToolbox"
 #define MyAppExeName "MyToolbox.exe"
@@ -23,8 +23,7 @@ OutputBaseFilename=MyToolbox_Setup_{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-;图标欢迎大家帮我想一下 后面暂定
-;SetupIconFile=res\app.ico
+SetupIconFile=res\app.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ArchitecturesInstallIn64BitMode=x64compatible
 ; 安装前关闭正在运行的程序

@@ -497,10 +497,13 @@ class TodoPage(QWidget):
     # ---------- 打开笔记 ----------
     def _open_note(self, note_id: int):
         try:
-            self.win.nav.setCurrentRow(0)
-            self.win.features_page._open_feature("note")
+            feature = self.win.features_page._feature_map.get("note")
+            if feature is None:
+                return
+            self.win.open_feature_detail(feature)
             from note_page import NotePage
-            detail = self.win.features_page._detail_cache.get("note")
+            cache = getattr(self.win, "_feature_detail_cache", {})
+            detail = cache.get("note")
             if detail:
                 for child in detail.findChildren(NotePage):
                     child.select_note(note_id)

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 
 from app_paths import load_config, save_config, get_data_dir
 import autostart
+from changelog import CURRENT_VERSION
 
 
 class SettingsPage(QWidget):
@@ -200,18 +201,32 @@ class SettingsPage(QWidget):
         clear_note_btn.clicked.connect(self._clear_notes)
         clear_task_btn = QPushButton("清空任务历史")
         clear_task_btn.clicked.connect(self._clear_task_history)
+        clear_clip_btn = QPushButton("清空剪贴板")
+        clear_clip_btn.clicked.connect(self._clear_clipboard)
         row6.addWidget(clear_log_btn)
         row6.addWidget(clear_note_btn)
         row6.addWidget(clear_task_btn)
+        row6.addWidget(clear_clip_btn)
         row6.addStretch()
         g5v.addLayout(row6)
+
+        # 剪贴板监听开关
+        self.clip_check = QCheckBox("启用剪贴板监听")
+        self.clip_check.stateChanged.connect(self._on_clip_toggle)
+        g5v.addWidget(self.clip_check)
 
         root.addWidget(g5)
 
         # ===== 关于 =====
         g6 = QGroupBox("关于")
         g6v = QVBoxLayout(g6)
-        about = QLabel("MyToolbox v0.5.0\n个人效率工具台\n-制作者：涛涛\n特别鸣谢：\n名单暂未上传")
+        about = QLabel(
+            f"MyToolbox v{CURRENT_VERSION}\n"
+            "个人效率工具台\n"
+            "-制作者：涛涛\n"
+            "特别鸣谢：\n"
+            "名单暂未上传"
+        )
         about.setStyleSheet("font-size: 12px;")
         g6v.addWidget(about)
         root.addWidget(g6)
@@ -289,6 +304,11 @@ class SettingsPage(QWidget):
         self.lock_spin.blockSignals(True)
         self.lock_spin.setValue(max(1, int(cfg.get("lock_delay_ms", 3000)) // 1000))
         self.lock_spin.blockSignals(False)
+
+        # 剪贴板监听开关
+        self.clip_check.blockSignals(True)
+        self.clip_check.setChecked(bool(cfg.get("clipboard_enabled", True)))
+        self.clip_check.blockSignals(False)
 
     def _refresh_sound_path_label(self, cfg: dict):
         """显示自定义音效文件名"""
@@ -487,6 +507,11 @@ class SettingsPage(QWidget):
         cfg["lock_delay_ms"] = val * 1000
         save_config(cfg)
 
+    def _on_clip_toggle(self, state):
+        cfg = load_config()
+        cfg["clipboard_enabled"] = bool(state)
+        save_config(cfg)
+
     # ---------- 测试 ----------
     def _test_toast(self):
         try:
@@ -529,6 +554,9 @@ class SettingsPage(QWidget):
             self.win.logger.clear()
             if hasattr(self.win, "log_page"):
                 self.win.log_page.log_view.clear()
+                # 新 LogPage 有 reload
+                if hasattr(self.win.log_page, "reload"):
+                    self.win.log_page.reload()
         except Exception as e:
             QMessageBox.warning(self, "失败", str(e))
             return
@@ -565,3 +593,26 @@ class SettingsPage(QWidget):
                 self.win.task_panel.refresh()
         except Exception:
             pass
+
+    def _clear_clipboard(self):
+        if not self._confirm_clear("所有剪贴板历史"):
+            return
+        try:
+            from clipboard_db import ClipboardDB
+            ClipboardDB().clear()
+        except Exception as e:
+            QMessageBox.warning(self, "失败", str(e))
+            return
+        self.win._append("剪贴板历史已清空", level="warn", source="设置")
+
+        # 通知剪贴板页刷新
+        try:
+            cache = getattr(self.win, "_feature_detail_cache", {})
+            detail = cache.get("clipboard")
+            if detail is not None:
+                from clipboard_page import ClipboardPage
+                for child in detail.findChildren(ClipboardPage):
+                    child.reload_from_db()
+                    break
+        except Exception as e:
+            print(f"[settings] 通知剪贴板页刷新失败: {e}")
